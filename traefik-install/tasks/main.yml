@@ -167,9 +167,6 @@
             var: deploy_output
 
       when: v_output.failed != true
-
----
-
         
 # Start Watchtower
 # -------------------------------------------------------------------------------------
