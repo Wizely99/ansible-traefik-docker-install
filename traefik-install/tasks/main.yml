@@ -105,10 +105,6 @@
       when: n_output
 
 
-: /run/secrets/cf_api_key
-      : /run/secrets/cf_api_email
-
-
 
 # ------------------------------------------------------
 # tasks file for portainer
@@ -171,9 +167,6 @@
             var: deploy_output
 
       when: v_output.failed != true
-
----
-
         
 # Start Watchtower
 # -------------------------------------------------------------------------------------
