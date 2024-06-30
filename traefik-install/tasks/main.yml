@@ -31,7 +31,7 @@
     #
     - name: Copy config file
       ansible.builtin.template:
-        src: templates/traefik.yaml.jinja2
+        src: templates/traefik.with-do-dns.yaml.jinja2
         dest: /etc/traefik/traefik.yaml
 
 
@@ -90,6 +90,9 @@
           networks:
             - name: "{{ traefik_docker_network_name }}" # required. Name of the network to operate on.
           restart_policy: always
+          env:
+            CF_API_KEY_FILE: "{{ CF_API_KEY_FILE | default('NONE') }}"
+            CF_API_EMAIL_FILE: "{{ CF_API_EMAIL_FILE | default('NONE') }}"
           labels:
             com.centurylinklabs.watchtower.enable: "false"
         register: d_output
@@ -100,3 +103,97 @@
           var: d_output
 
       when: n_output
+
+
+: /run/secrets/cf_api_key
+      : /run/secrets/cf_api_email
+
+
+
+# ------------------------------------------------------
+# tasks file for portainer
+
+- name: Configuring portainer docker
+
+  vars:
+    image_labels:
+      - key: "com.centurylinklabs.watchtower.enable"
+        value: "true"
+      - key: "traefik.enable"
+        value: "true"
+      - key: "traefik.http.routers.portainer.rule"
+        value: "Host(`{{ DOMAIN_NAME }}`)"
+      - key: "traefik.http.routers.portainer.entrypoints"
+        value: "websecure"
+      - key: "traefik.http.services.portainer.loadbalancer.server.port"
+        value: "9000"
+      - key: "traefik.http.routers.portainer.tls.certresolver"
+        value: "production"
+
+  block:
+
+    # Create Portainer Volume
+    # --
+    # 
+    - name: Create new Volume
+      community.docker.docker_volume:
+        name: portainer-data
+      register: v_output
+      ignore_errors: true
+
+    - name: Debug Portainer Volume
+      ansible.builtin.debug:
+        var: v_output
+
+
+    # Deploy Portainer
+    # --
+    #   
+    - name: Deploy Portainer
+      block:
+        - name: deployment
+          community.docker.docker_container:
+            name: portainer
+            image: "docker.io/portainer/portainer-ce"
+            expose:
+              - 9000
+            volumes:
+              - /var/run/docker.sock:/var/run/docker.sock
+              - portainer-data:/data
+            networks:
+              - name: "{{ traefik_docker_network_name }}" # required. Name of the network to operate on.
+            restart_policy: always
+            labels: "{{ image_labels | items2dict }}"
+          register: deploy_output
+
+        - name: Debug Portainer deployment
+          ansible.builtin.debug:
+            var: deploy_output
+
+      when: v_output.failed != true
+
+---
+
+        
+# Start Watchtower
+# -------------------------------------------------------------------------------------
+#
+- name: Deploy Watchtower
+  community.docker.docker_container:
+    name: watchtower
+    image: "docker.io/containrrr/watchtower"
+    volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+       - /root/.docker/config.json:/config.json
+    restart_policy: always
+    env:
+      TZ: Africa/Dar_es_Salaam
+      WATCHTOWER_LIFECYCLE_HOOKS: "1" # Enable pre/post-update scripts
+    command: --debug --cleanup --interval 30
+  register: output 
+  ignore_errors: true
+
+- name: Debug output
+  ansible.builtin.debug:
+    var: output
+

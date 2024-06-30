@@ -1,0 +1,131 @@
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false  # true by default
+
+# (Optional) Enable API and Dashboard
+# ---
+api:
+  dashboard: true  # true by default
+  insecure: false  # Don't do this in production!
+
+# Entry Points configuration
+# ---
+entryPoints:
+  web:
+    address: :80
+    # (Optional) Redirect to HTTPS
+    # ---
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+
+  websecure:
+    address: :443
+  flower:
+    address: ':5555'
+# MEMPLAS SPECIFIC SETTING
+http:
+  routers:
+    web-secure-router:
+      rule: 'HostRegexp(`{subdomain:[a-z]+}.memplas.com`)'
+      
+      entryPoints:
+        - web-secure
+      middlewares:
+        - csrf
+      service: django
+      tls:
+        # https://doc.traefik.io/traefik/routing/routers/#certresolver
+        certResolver: letsencrypt
+
+    flower-secure-router:
+      rule: 'Host(`memplas.com`)'
+      entryPoints:
+        - flower
+      service: flower
+      tls:
+        # https://doc.traefik.io/traefik/master/routing/routers/#certresolver
+        certResolver: letsencrypt
+
+    web-media-router:
+      rule: 'HostRegexp(`{subdomain:[a-z]+}.memplas.com`) && PathPrefix(`/media/`)'
+      entryPoints:
+        - web-secure
+      middlewares:
+        - csrf
+      service: django-media
+      tls:
+        certResolver: letsencrypt
+
+  middlewares:
+    csrf:
+      # https://doc.traefik.io/traefik/master/middlewares/http/headers/#hostsproxyheaders
+      # https://docs.djangoproject.com/en/dev/ref/csrf/#ajax
+      headers:
+        hostsProxyHeaders: ['X-CSRFToken']
+
+  services:
+    django:
+      loadBalancer:
+        servers:
+          - url: http://django:5000
+
+    flower:
+      loadBalancer:
+        servers:
+          - url: http://flower:5555
+
+    django-media:
+      loadBalancer:
+        servers:
+          - url: http://nginx:80
+
+
+# Configure your CertificateResolver here...
+# ---
+certificatesResolvers:
+  staging:
+    acme:
+      email: hermanpaul050597@gmail.com
+      storage: /etc/traefik/certs/acme.json
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      tlsChallenge: {}
+      httpChallenge:
+        entryPoint: web
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: 60
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+  production:
+    acme:
+      email: hermanpaul050597@gmail.com
+      storage: /etc/traefik/certs/acme.json
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      tlsChallenge: {}
+      httpChallenge:
+        entryPoint: web
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: 60
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+
+
+providers:
+  # https://doc.traefik.io/traefik/master/providers/docker/#exposedbydefault
+  docker:
+    exposedByDefault: false  # Default is true
+    #  If set to false, containers that do not have a traefik.enable=true 
+    # label are ignored from the resulting routing configuration.
+  file:
+    # watch for dynamic configuration changes
+    #https://doc.traefik.io/traefik/master/providers/file/#watch
+    directory: /etc/traefik
+    watch: true

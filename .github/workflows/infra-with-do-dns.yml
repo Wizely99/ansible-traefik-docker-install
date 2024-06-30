@@ -9,11 +9,11 @@ on:
       SSH_PORT:
         type: string
         required: false
-        default: 22
+        default: '22'
       SSH_USER:
         type: string
         required: false
-        default: "root"
+        default: "ubuntu"
       ANSIBLE_BECOME_PASS:
         type: string
         required: false
@@ -21,8 +21,11 @@ on:
       SSH_USER_HOME_DIR:
         type: string
         required: false
-        default: "/root"
+        default: "/home/ubuntu"
       EMAIL:
+        type: string
+        required: true
+      DOMAIN_NAME:
         type: string
         required: true
 
@@ -76,8 +79,10 @@ jobs:
           mkdir -p ${{ env.ansible-play }}/vars/
           cat << EOF > ${{ env.ansible-play }}/vars/main.yaml
           ---
-          DO_AUTH_TOKEN: "${{ secrets.DO_AUTH_TOKEN }}"
+          CF_API_KEY_FILE: "${{ secrets.CF_API_KEY_FILE }}"
+          CF_API_EMAIL_FILE: "${{ secrets.CF_API_EMAIL_FILE }}"
           EMAIL: "${{ inputs.EMAIL }}"
+          DOMAIN_NAME: "${{ inputs.DOMAIN_NAME }}"
           EOF
       
       - name: Run main playbook
@@ -85,5 +90,7 @@ jobs:
           if [ "${{ inputs.ANSIBLE_BECOME_PASS }}" != "no-password" ]; then
             ANSIBLE_CONFIG=ansible.cfg ansible-playbook --ask-become-pass ${{ env.ansible-main-file }}
           else
-            ANSIBLE_CONFIG=ansible.cfg ansible-playbook ${{ env.ansible-main-file }}
+            ANSIBLE_CONFIG=ansible.cfg ansible-playbook  ${{ env.ansible-main-file }}
           fi
+
+
