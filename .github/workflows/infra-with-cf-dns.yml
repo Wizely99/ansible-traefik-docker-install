@@ -30,8 +30,8 @@ on:
         required: true
 
 env:
-  ansible-play: traefik-install-with-do-dns
-  ansible-main-file: main.with-do-dns.yml
+  ansible-play: traefik-install
+  ansible-main-file: main.with-cf-dns.yml
         
 jobs:
    ansible:
