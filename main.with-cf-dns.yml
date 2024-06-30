@@ -3,7 +3,7 @@
   become: yes
   
   roles:
-    - traefik-install-with-do-dns
+    - traefik-install
 
   vars:
     traefik_docker_network_name: traefik_network
